@@ -6,6 +6,7 @@ import { connect } from 'react-redux';
 import { setUserPosts } from '../../actions';
 import firebase from '../../firebase';
 import Message from './Message';
+import Typing from './Typing';
 
 class Messages extends React.Component {
     state = {
@@ -165,6 +166,9 @@ class Messages extends React.Component {
                 <Segment>
                     <Comment.Group className='messages'>
                         {searchTerm ? this.displayMessages(searchResults) : this.displayMessages(messages)}
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <span className="user__typing">Harry is typing</span><Typing />
+                        </div>
                     </Comment.Group>
                 </Segment>
                 <MessageForm messagesRef={messagesRef} currentChannel={channel} currentUser={user} isPrivateChannel={privateChannel} getMessagesRef={this.getMessagesRef} />
