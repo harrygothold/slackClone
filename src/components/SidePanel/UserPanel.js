@@ -1,13 +1,23 @@
 import React from "react";
 import firebase from "../../firebase";
 import { Grid, Header, Icon, Dropdown, Image, Modal, Input, Button } from "semantic-ui-react";
+import AvatarEditor from 'react-avatar-editor';
 
 class UserPanel extends React.Component {
 
     state = {
         user: this.props.currentUser,
         modal: false,
-        previewImage: ''
+        previewImage: '',
+        croppedImage: '',
+        uploadedCroppedImage: '',
+        blob: '',
+        storageRef: firebase.storage().ref(),
+        userRef: firebase.auth().currentUser,
+        usersRef: firebase.database().ref('users'),
+        metadata: {
+            contentType: 'image/jpeg'
+        }
     };
 
     openModal = () => this.setState({ modal: true });
@@ -43,6 +53,41 @@ class UserPanel extends React.Component {
                 this.setState({ previewImage: reader.result })
             })
         }
+    };
+
+    handleCropImage = () => {
+        if (this.avatarEditor) {
+            this.avatarEditor.getImageScaledToCanvas().toBlob(blob => {
+                let imageUrl = URL.createObjectURL(blob);
+                this.setState({ croppedImage: imageUrl, blob })
+            });
+        }
+    };
+
+    uploadCroppedImage = () => {
+        const { storageRef, userRef, blob, metadata } = this.state;
+        storageRef.child(`avatars/user-${userRef.uid}`)
+            .put(blob, metadata)
+            .then(snap => {
+                snap.ref.getDownloadURL().then(downloadUrl => {
+                    this.setState({ uploadedCroppedImage: downloadUrl }, () => this.changeAvatar())
+                })
+            })
+    }
+
+    changeAvatar = () => {
+        this.state.userRef.updateProfile({
+            photoURL: this.state.uploadedCroppedImage
+        })
+            .then(() => {
+                console.log('PHOTOURL updated');
+                this.closeModal();
+            }).catch(err => console.log(err));
+        this.state.usersRef.child(this.state.user.uid)
+            .update({ avatar: this.state.uploadedCroppedImage })
+            .then(() => {
+                console.log('User avatar updated');
+            }).catch(err => console.log(err));
     }
 
     handleSignout = () => {
@@ -53,7 +98,8 @@ class UserPanel extends React.Component {
     };
 
     render() {
-        const { user, modal } = this.state;
+        // eslint-disable-next-line
+        const { user, modal, previewImage, croppedImage, blob } = this.state;
         const { primaryColor } = this.props;
 
         return (
@@ -84,19 +130,23 @@ class UserPanel extends React.Component {
                             <Grid centered stackable columns={2}>
                                 <Grid.Row centered>
                                     <Grid.Column className='ui center aligned grid'>
-                                        {/* image preview */}
+                                        {previewImage && (
+                                            <AvatarEditor ref={node => (this.avatarEditor = node)} image={previewImage} width={120} height={120} border={50} scale={1.2} />
+                                        )}
                                     </Grid.Column>
                                     <Grid.Column>
-                                        {/* cropped image preview */}
+                                        {croppedImage && (
+                                            <Image style={{ margin: '3.5em auto' }} width={100} height={100} src={croppedImage} />
+                                        )}
                                     </Grid.Column>
                                 </Grid.Row>
                             </Grid>
                         </Modal.Content>
                         <Modal.Actions>
-                            <Button color='green' inverted>
+                            {croppedImage && <Button color='green' inverted onClick={this.uploadCroppedImage}>
                                 <Icon name='save' /> Change Avatar
-                            </Button>
-                            <Button color='blue' inverted>
+                            </Button>}
+                            <Button color='blue' inverted onClick={this.handleCropImage}>
                                 <Icon name='image' /> Preview
                             </Button>
                             <Button color='red' inverted onClick={this.closeModal}>
